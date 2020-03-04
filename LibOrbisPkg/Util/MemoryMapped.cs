@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 
@@ -112,6 +113,43 @@ namespace LibOrbisPkg.Util
       }
     }
   }
+  /// <summary>
+  /// Non-thread safe buffered reader
+  /// </summary>
+  class BufferedMemoryReader : IMemoryReader
+  {
+    private long bufferStart;
+    private byte[] buffer;
+    private IMemoryReader reader;
+    public BufferedMemoryReader(IMemoryReader mr, int bufferSize)
+    {
+      buffer = new byte[bufferSize];
+      reader = mr;
+      bufferStart = -buffer.Length - 1;
+    }
+
+    public void Dispose()
+    {
+    }
+
+    public void Read(long pos, byte[] buf, int offset, int count)
+    {
+      while (count > 0 && pos > 0)
+      {
+        if (bufferStart > pos || pos >= bufferStart + buffer.Length)
+        {
+          bufferStart = pos;
+          reader.Read(pos, buffer, 0, buffer.Length);
+        }
+        int offsetIntoBuffer = (int)(pos - bufferStart);
+        int toReadFromChunk = Math.Min(buffer.Length - offsetIntoBuffer, count);
+        Buffer.BlockCopy(buffer, offsetIntoBuffer, buf, offset, toReadFromChunk);
+        pos += toReadFromChunk;
+        offset += toReadFromChunk;
+        count -= toReadFromChunk;
+      }
+    }
+  }
   public class MemoryMappedViewAccessor_ : IMemoryAccessor
   {
     private MemoryMappedViewAccessor _va;
@@ -141,6 +179,91 @@ namespace LibOrbisPkg.Util
     public void Read(long pos, byte[] buf, int offset, int count)
     {
       _va.ReadArray(pos, buf, offset, count);
+    }
+  }
+
+  public class StreamReader : IMemoryReader
+  {
+    bool owns;
+    long startOffset;
+    System.IO.Stream stream;
+
+    public StreamReader(System.IO.Stream s, long offset = 0, bool takeOwnership = false)
+    {
+      stream = s;
+      owns = takeOwnership;
+      startOffset = offset;
+    }
+    public void Dispose()
+    {
+      if(owns)
+      {
+        stream.Dispose();
+      }
+    }
+
+    public void Read(long pos, byte[] buf, int offset, int count)
+    {
+      stream.Position = pos + startOffset;
+      stream.Read(buf, offset, count);
+    }
+  }
+  public class StreamWrapper : Stream
+  {
+    private IMemoryReader reader;
+    public StreamWrapper(IMemoryReader r, long size)
+    {
+      reader = r;
+      Length = size;
+    }
+    private long position = 0;
+    public override bool CanRead => true;
+
+    public override bool CanSeek => true;
+
+    public override bool CanWrite => false;
+
+    public override long Length { get; }
+
+    public override long Position { get => position; set => position = value; }
+
+    public override void Flush()
+    {
+      throw new NotImplementedException();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+      reader.Read(position, buffer, offset, count);
+      position += count;
+      return count;
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+      switch (origin)
+      {
+        case SeekOrigin.Begin:
+          position = offset;
+          break;
+        case SeekOrigin.Current:
+          position += offset;
+          break;
+        case SeekOrigin.End:
+          position = Length + offset;
+          break;
+      }
+      return position;
+    }
+
+    public override void SetLength(long value)
+    {
+      throw new NotImplementedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+      throw new NotImplementedException();
     }
   }
 }

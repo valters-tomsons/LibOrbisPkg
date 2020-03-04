@@ -73,7 +73,7 @@ namespace LibOrbisPkg.PKG
     /// </summary>
     /// <param name="pkg"></param>
     /// <param name="passcode"></param>
-    /// <returns></returns>
+    /// <returns>The EKPFS if successful; null otherwise</returns>
     public byte[] GetEkpfs()
     {
       try
@@ -91,7 +91,7 @@ namespace LibOrbisPkg.PKG
       }
       catch
       {
-        return new byte[32];
+        return null;
       }
     }
 
@@ -108,11 +108,20 @@ namespace LibOrbisPkg.PKG
       return digest0.SequenceEqual(EntryKeys.Keys[0].digest);
     }
 
-    public bool CheckEkpfs(byte[] dk1)
+    public bool CheckDerivedKey(byte[] dk, int index)
     {
-      var digest = Crypto.Sha256(dk1).Xor(dk1);
-      return digest.SequenceEqual(EntryKeys.Keys[1].digest);
+      if(index < 0 || index > 6)
+      {
+        throw new ArgumentException("Invalid derived key index: " + index);
+      }
+      if (dk == null || dk.Length != 32)
+        return false;
+      var digest = Crypto.Sha256(dk).Xor(dk);
+      return digest.SequenceEqual(EntryKeys.Keys[index].digest);
+
     }
+
+    public bool CheckEkpfs(byte[] dk1) => CheckDerivedKey(dk1, 1);
 
     string CreateMajorParamString()
     {
@@ -185,7 +194,7 @@ namespace LibOrbisPkg.PKG
     /// </summary>
     public Dictionary<GeneralDigest, byte[]> CalcGeneralDigests()
     {
-      return new Dictionary<GeneralDigest, byte[]>
+      var digests = new Dictionary<GeneralDigest, byte[]>
       {
         { GeneralDigest.HeaderDigest, ComputeHeaderDigest() },
         { GeneralDigest.GameDigest, Header.pfs_image_digest },
@@ -193,6 +202,11 @@ namespace LibOrbisPkg.PKG
         { GeneralDigest.MajorParamDigest, ComputeMajorParamDigest() },
         { GeneralDigest.ParamDigest, Crypto.Sha256(ParamSfo.ParamSfo.Serialize()) },
       };
+      if (Header.content_type == ContentType.AL)
+      {
+        digests.Remove(GeneralDigest.GameDigest);
+      }
+      return digests;
     }
   }
 

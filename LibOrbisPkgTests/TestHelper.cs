@@ -62,19 +62,51 @@ namespace LibOrbisPkgTests
       Pkg pkg;
       using (var mmf = MemoryMappedFile.CreateFromFile(pkgPath))
       {
-        using (var s = mmf.CreateViewStream())
+        using (var s = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read))
         {
           pkg = new PkgReader(s).ReadPkg();
         }
         var ekpfs = LibOrbisPkg.Util.Crypto.ComputeKeys(pkg.Header.content_id, "00000000000000000000000000000000", 1);
         var outerPfsOffset = (long)pkg.Header.pfs_image_offset;
-        using (var acc = mmf.CreateViewAccessor(outerPfsOffset, (long)pkg.Header.pfs_image_size))
+        using (var acc = mmf.CreateViewAccessor(outerPfsOffset, (long)pkg.Header.pfs_image_size, MemoryMappedFileAccess.Read))
         {
           var outerPfs = new PfsReader(acc, pkg.Header.pfs_flags, ekpfs);
           var inner = new PfsReader(new PFSCReader(outerPfs.GetFile("pfs_image.dat").GetView()));
           // Check that the sce_sys directory exists
           innerPfsAction(inner);
         }
+      }
+    }
+
+    public static void OpenPkgFilesystem(System.IO.Stream pkgStream, Action<PfsReader> innerPfsAction)
+    {
+      Pkg pkg;
+      pkg = new PkgReader(pkgStream).ReadPkg();
+      var ekpfs = LibOrbisPkg.Util.Crypto.ComputeKeys(pkg.Header.content_id, "00000000000000000000000000000000", 1);
+      var outerPfsOffset = (long)pkg.Header.pfs_image_offset;
+      using (var acc = new LibOrbisPkg.Util.StreamReader(pkgStream, outerPfsOffset))
+      {
+        var outerPfs = new PfsReader(acc, pkg.Header.pfs_flags, ekpfs);
+        var inner = new PfsReader(new PFSCReader(outerPfs.GetFile("pfs_image.dat").GetView()));
+        // Check that the sce_sys directory exists
+        innerPfsAction(inner);
+      }
+    }
+
+    public class ArrayMemoryReader : LibOrbisPkg.Util.IMemoryReader
+    {
+      private byte[] array;
+      public ArrayMemoryReader(byte[] backing)
+      {
+        array = backing;
+      }
+      public void Dispose()
+      { }
+
+      public void Read(long pos, byte[] buf, int offset, int count)
+      {
+        if (pos > int.MaxValue) throw new Exception("Don't think there's a way to block-copy beyond the int32 limit :(");
+        Buffer.BlockCopy(array, (int)pos, buf, offset, count);
       }
     }
   }
