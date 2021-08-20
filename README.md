@@ -1,6 +1,11 @@
 # LibOrbisPkg
 [![Build status](https://ci.appveyor.com/api/projects/status/f0bok1ljnshd2dr0?svg=true)](https://ci.appveyor.com/project/maxton/liborbispkg/build/artifacts)
 
+## Note from OpenOrbis
+The original developer (maxton) has passed away unexpectedly, we will be keeping this fork up to date as we rely on it for the OpenOrbis toolchain. His contributions will not be forgotten or abandoned. RIP.
+
+---
+
 I am developing an open source library for reading and writing PS4 PKG files.
 This project's goal is to eliminate the need to use proprietary SDK tools.
 Without a proper open PKG tool, the PS4 homebrew scene cannot flourish. 
