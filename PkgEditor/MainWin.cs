@@ -8,6 +8,9 @@ using System.Text;
 using System.IO;
 using LibOrbisPkg;
 using System.Windows.Forms;
+using System.Diagnostics;
+using LibOrbisPkg.PKG;
+using LibOrbisPkg.PFS;
 
 namespace PkgEditor
 {
@@ -57,6 +60,11 @@ namespace PkgEditor
       }
     }
 
+    private void openPFS(string filename)
+    {
+      OpenTab(new Views.PFSView(filename), Path.GetFileName(filename));
+    }
+
     public void OpenTab(Views.View c, string name)
     {
       var x = new TabPage(name);
@@ -90,15 +98,26 @@ namespace PkgEditor
         case "sfo":
           openSfo(file);
           break;
+        case "pfs":
+        case "dat":
+          openPFS(file);
+          break;
       }
     }
 
     private void openToolStripMenuItem_Click(object sender, EventArgs e)
     {
-      ShowOpenFileDialog("Open a GP4, PKG, SFO", "All Supported|*.gp4;*.pkg;*.sfo|GP4 Projects (*.gp4)|*.gp4|PKG Files (*.pkg)|*.pkg|SFO Files (*.sfo)|*.sfo", f =>
-      {
-        openFile(f);
-      });
+      ShowOpenFileDialog(
+        "Open a GP4, PKG, SFO",
+        "All Supported|*.gp4;*.pkg;*.sfo;*.pfs;*.dat"
+        + "|GP4 Projects (*.gp4)|*.gp4"
+        + "|PKG Files (*.pkg)|*.pkg"
+        + "|SFO Files (*.sfo)|*.sfo"
+        + "|PFS Images (*.pfs, *.dat)|*.pfs;*.dat",
+        f =>
+        {
+          openFile(f);
+        });
     }
 
     private void closeToolStripMenuItem_Click(object sender, EventArgs e)
@@ -239,6 +258,68 @@ namespace PkgEditor
             }
           }
           logWindow.GetWriter().WriteLine("Done. Saved to "+targetFilename);
+        }
+      }
+    }
+
+    private void cryptoDebuggerToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      OpenTab(new Views.CryptoDebug(), "Crypto Debugger");
+    }
+
+    private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+      var version = FileVersionInfo.GetVersionInfo(assembly.Location).FileVersion;
+      var libAssembly = System.Reflection.Assembly.GetAssembly(typeof(LibOrbisPkg.PKG.Pkg));
+      var libVersion = FileVersionInfo.GetVersionInfo(libAssembly.Location).FileVersion;
+      MessageBox.Show(this, 
+        "PkgEditor (c) 2020 Maxton" + Environment.NewLine +
+        "LibOrbisPkg version "+ libVersion + Environment.NewLine +
+        "PkgEditor version " + version,
+        "About PkgEditor");
+    }
+
+    private void visitGitHubRepoToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      Process.Start("https://github.com/maxton/LibOrbisPkg");
+    }
+
+    private void setPKGPFSFileMetadataToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      using (var ofd = new OpenFileDialog() {
+        Title = "Select files",
+        Filter = "PKG/PFS Files (*.pkg, *.dat)|*.pkg;*.dat",
+        Multiselect = true
+      })
+      {
+        if (ofd.ShowDialog() != DialogResult.OK)
+          return;
+        foreach(var filename in ofd.FileNames)
+        {
+          DateTime creationTime = File.GetCreationTimeUtc(filename);
+          DateTime modifiedTime = File.GetLastWriteTime(filename);
+          using (var f = File.OpenRead(filename))
+          {
+            if (filename.ToLowerInvariant().EndsWith(".dat"))
+            {
+              var header = PfsHeader.ReadFromStream(f);
+              creationTime = modifiedTime =
+                new DateTime(1970, 1, 1)
+                .AddSeconds(header.InodeBlockSig.Time1_sec);
+            }
+            else if (filename.ToLowerInvariant().EndsWith(".pkg"))
+            {
+              var pkgHeader = new PkgReader(f).ReadHeader();
+              f.Position = (long)pkgHeader.pfs_image_offset;
+              var header = PfsHeader.ReadFromStream(f);
+              creationTime = modifiedTime =
+                new DateTime(1970, 1, 1)
+                .AddSeconds(header.InodeBlockSig.Time1_sec);
+            }
+          }
+          File.SetCreationTimeUtc(filename, creationTime);
+          File.SetLastWriteTimeUtc(filename, modifiedTime);
         }
       }
     }

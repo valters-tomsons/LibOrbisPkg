@@ -74,7 +74,7 @@ namespace LibOrbisPkg.PFS
           return new ChunkedMemoryReader(reader, 0x10000, blocks);
         return new MemoryAccessor(reader, offset);
       }
-      public void Save(string path)
+      public void Save(string path, bool decompress = false)
       {
         var buf = new byte[0x10000];
         using (var file = System.IO.File.OpenWrite(path))
@@ -83,6 +83,11 @@ namespace LibOrbisPkg.PFS
           file.SetLength(sz);
           long pos = 0;
           var reader = GetView();
+          if (decompress && size != compressed_size)
+          {
+            sz = compressed_size;
+            reader = new PFSCReader(reader);
+          }
           while (sz > 0)
           {
             var toRead = (int)Math.Min(sz, buf.Length);
@@ -133,16 +138,18 @@ namespace LibOrbisPkg.PFS
       }
       if (hdr.Mode.HasFlag(PfsMode.Encrypted))
       {
+        const int XtsSectorSize = 0x1000;
+        uint XtsStartSector = hdr.BlockSize / XtsSectorSize;
         if (ekpfs == null && (tweak == null || data == null))
           throw new ArgumentException("PFS image is encrypted but no decryption key was provided");
         if (ekpfs != null)
         {
           var (tweakKey, dataKey) = Crypto.PfsGenEncKey(ekpfs, hdr.Seed, (pfs_flags & 0x2000000000000000UL) != 0);
-          reader = new XtsDecryptReader(reader, dataKey, tweakKey, 16, 0x1000);
+          reader = new XtsDecryptReader(reader, dataKey, tweakKey, XtsStartSector, XtsSectorSize);
         }
         else
         {
-          reader = new XtsDecryptReader(reader, data, tweak, 16, 0x1000);
+          reader = new XtsDecryptReader(reader, data, tweak, XtsStartSector, XtsSectorSize);
         }
       }
       var total = 0;

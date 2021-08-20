@@ -63,6 +63,28 @@ namespace PkgTool
         {
           var proj = args[1];
           var project = Gp4Project.ReadFrom(File.OpenRead(proj));
+          var validation = Gp4Validator.ValidateProject(project, Path.GetDirectoryName(proj));
+          bool ok = true;
+          if (validation.Count > 0)
+          {
+            Console.WriteLine("Found {0} issue(s) with GP4 project:", validation.Count);
+          }
+          foreach (ValidateResult v in validation)
+          {
+            if (v.Type == ValidateResult.ResultType.Fatal)
+            {
+              ok = false;
+            }
+            Console.WriteLine("{0}: {1}",
+              v.Type == ValidateResult.ResultType.Fatal ? "FATAL ERROR" : "WARNING    ",
+              v.Message);
+          }
+          if (!ok)
+          {
+            Console.WriteLine("Cannot build PKG due to fatal errors.");
+            Environment.Exit(1);
+            return;
+          }
           var props = PkgProperties.FromGp4(project, Path.GetDirectoryName(proj));
           var outputPath = args[2];
           new PkgBuilder(props).Write(Path.Combine(
@@ -209,7 +231,7 @@ namespace PkgTool
               }
               s.Close();
               using (var pkgMM = MemoryMappedFile.CreateFromFile(pkgPath, FileMode.Open))
-              using (var o = MemoryMappedFile.CreateFromFile(outPath, capacity: outerpfs_size, mapName: "output_outerpfs", mode: FileMode.Create))
+              using (var o = MemoryMappedFile.CreateFromFile(outPath, capacity: outerpfs_size, mapName: null, mode: FileMode.Create))
               using (var outputView = o.CreateViewAccessor(0, 0, MemoryMappedFileAccess.ReadWrite))
               using (var outerPfs = new MemoryMappedViewAccessor_(
                   pkgMM.CreateViewAccessor((long)pkg.Header.pfs_image_offset, (long)pkg.Header.pfs_image_size, MemoryMappedFileAccess.Read),
@@ -473,6 +495,19 @@ namespace PkgTool
             new ParamSfo().Write(f);
           }
         }),
+      Verb.Create(
+        "version",
+        "Print the version and exit.",
+        new List<ArgDef>(),
+        _ => {
+          var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+          var version = System.Diagnostics.FileVersionInfo.GetVersionInfo(assembly.Location).FileVersion;
+          var libAssembly = System.Reflection.Assembly.GetAssembly(typeof(Pkg));
+          var libVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(libAssembly.Location).FileVersion;
+          Console.WriteLine("PkgTool (c) 2020 Maxton");
+          Console.WriteLine("LibOrbisPkg version " + libVersion);
+          Console.WriteLine("PkgTool version " + version);
+        }),
     };
 
     private static void ExtractInParallel(PfsReader inner, string outPath, bool verbose)
@@ -582,6 +617,8 @@ namespace PkgTool
     }
     public override string ToString()
     {
+      if (Args == null || Args.Count == 0)
+        return Name;
       var options = Args
         .Select(x => 
           x.Type == ArgType.Boolean ? $"[--{x.Name}]" :

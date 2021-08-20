@@ -1,4 +1,4 @@
-version: 0.1.{build}
+version: 0.2.{build}
 
 
 branches:
@@ -30,6 +30,7 @@ build:
 
 after_build:
  - dotnet publish -c Release -r linux-x64 /p:PublishSingleFile=true PkgTool.Core
+ - dotnet publish -c Release -r osx-x64 /p:PublishSingleFile=true PkgTool.Core
  - >
    7z a PkgEditor-%APPVEYOR_BUILD_VERSION%.zip 
    %APPVEYOR_BUILD_FOLDER%\PkgEditor\bin\Release\PkgEditor.exe
@@ -69,6 +70,11 @@ after_build:
    %APPVEYOR_BUILD_FOLDER%\README.md
    %APPVEYOR_BUILD_FOLDER%\LICENSE.txt
  - >
+   7z a PkgTool.Core-osx-x64-%APPVEYOR_BUILD_VERSION%.zip 
+   "%APPVEYOR_BUILD_FOLDER%\PkgTool.Core\bin\Any CPU\Release\netcoreapp3.0\osx-x64\publish\PkgTool.Core"
+   %APPVEYOR_BUILD_FOLDER%\README.md
+   %APPVEYOR_BUILD_FOLDER%\LICENSE.txt
+ - >
    7z a LibOrbisPkg.Core-%APPVEYOR_BUILD_VERSION%.zip 
    %APPVEYOR_BUILD_FOLDER%\LibOrbisPkg.Core\bin\Release\netcoreapp3.0\LibOrbisPkg.Core.dll
    %APPVEYOR_BUILD_FOLDER%\README.md
@@ -81,23 +87,4 @@ artifacts:
 - path: PkgTool.Core-%APPVEYOR_BUILD_VERSION%.zip
 - path: LibOrbisPkg.Core-%APPVEYOR_BUILD_VERSION%.zip
 - path: PkgTool.Core-linux-x64-%APPVEYOR_BUILD_VERSION%.zip 
-
-deploy:
-  release: LibOrbisPkg-v$(appveyor_build_version)
-  description: >
-    This is an automated release from AppVeyor.
-
-    Download PkgEditor-$(appveyor_build_version).zip for the GUI,
-    PkgTool-$(appveyor_build_version).zip for the command line tool,
-    or LibOrbisPkg-$(appveyor_build_version).zip for just the library.
-
-    These require .NET Framework 4.
-  provider: GitHub
-  auth_token:
-    secure: z9kvAXqpBrX9O9Rx3u2gnIsitemVB0lFy54njPk2DUY+gK6F6S4Z10kh/mrFP+xD
-  artifact: /.*\.zip/
-  draft: false
-  prerelease: false
-  on:
-    branch: master
-    APPVEYOR_REPO_TAG: true
+- path: PkgTool.Core-osx-x64-%APPVEYOR_BUILD_VERSION%.zip 

@@ -17,18 +17,15 @@ namespace PkgEditor.Views
 {
   public partial class FileView : UserControl
   {
-    private PfsReader reader;
-    public FileView(PfsReader p = null)
+    public FileView()
     {
-      reader = p;
       InitializeComponent();
-      InitializeTree();
     }
 
-    private void InitializeTree()
+    public void AddRoot(PfsReader p, string name)
     {
-      var superroot = reader.GetSuperRoot();
-      var root = new TreeNode("Inner PFS Image") { Tag = superroot };
+      var superroot = p.GetSuperRoot();
+      var root = new TreeNode(name) { Tag = superroot };
       directoryTreeView.Nodes.Add(root);
       root.Nodes.Add("Loading", "Loading...", 0);
       ExpandNode(root);
@@ -43,6 +40,7 @@ namespace PkgEditor.Views
         currentFolderListView.Items.Add(
           new ListViewItem(new[] {
             child.name,
+            child is PfsDir ? "" : HumanReadableFileSize(child.compressed_size),
             child is PfsDir ? "" : HumanReadableFileSize(child.size),
           },
           child is PfsDir ? 1 : 0)
@@ -98,7 +96,7 @@ namespace PkgEditor.Views
       }
     }
 
-    private void Extract(PfsNode n)
+    private void Extract(PfsNode n, bool compressed = false)
     {
       var sfd = new SaveFileDialog()
       {
@@ -113,7 +111,7 @@ namespace PkgEditor.Views
         }
         else if (n is PfsFile f)
         {
-          f.Save(sfd.FileName);
+          f.Save(sfd.FileName, !compressed);
         }
       }
     }
@@ -168,6 +166,23 @@ namespace PkgEditor.Views
             stuff.Add((i as ListViewItem)?.Tag as PfsNode);
           ExtractMultiple(stuff);
         }
+      }
+    }
+
+    private void extractCompressedPFSCToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      if (currentFolderListView.Focused && currentFolderListView.SelectedItems.Count == 1 && currentFolderListView.SelectedItems[0].Tag is PfsNode n)
+      {
+        Extract(n, compressed: true);
+      }
+    }
+
+    private void contextMenuStrip1_Opening(object sender, CancelEventArgs e)
+    {
+      extractCompressedPFSCToolStripMenuItem.Enabled = false;
+      if (currentFolderListView.Focused && currentFolderListView.SelectedItems.Count == 1 && currentFolderListView.SelectedItems[0].Tag is PfsNode n)
+      {
+        extractCompressedPFSCToolStripMenuItem.Enabled = n.compressed_size != n.size;
       }
     }
   }

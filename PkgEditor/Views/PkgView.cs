@@ -33,12 +33,11 @@ namespace PkgEditor.Views
     private MemoryMappedFile pkgFile;
     private MemoryMappedViewAccessor va;
     private string passcode;
-    private static int idx;
     public PkgView(string path)
     {
       InitializeComponent();
       if (path == null) return;
-      pkgFile = MemoryMappedFile.CreateFromFile(path, FileMode.Open, "pkgFile"+idx++, 0, MemoryMappedFileAccess.Read);
+      pkgFile = MemoryMappedFile.CreateFromFile(path, FileMode.Open, mapName: null, 0, MemoryMappedFileAccess.Read);
       using (var s = pkgFile.CreateViewStream(0, 0, MemoryMappedFileAccess.Read))
         ObjectPreview(new PkgReader(s).ReadHeader(), pkgHeaderTreeView);
       using (var s = pkgFile.CreateViewStream(0, 0, MemoryMappedFileAccess.Read))
@@ -64,7 +63,7 @@ namespace PkgEditor.Views
       titleTextBox.Text = pkg.ParamSfo.ParamSfo["TITLE"]?.ToString();
       sizeLabel.Text = FileView.HumanReadableFileSize((long)pkg.Header.package_size);
       var category = pkg.ParamSfo.ParamSfo["CATEGORY"].ToString();
-      typeLabel.Text = SFOView.SfoTypes.Where(x => x.Category == category).FirstOrDefault() is SFOView.SfoType t ? t.Description : "Unknown";
+      typeLabel.Text = SfoData.SfoTypes.Where(x => x.Category == category).FirstOrDefault() is SfoType t ? t.Description : "Unknown";
       versionLabel.Text = pkg.ParamSfo.ParamSfo["VERSION"]?.ToString();
       if (pkg.ParamSfo.ParamSfo["APP_VER"] is Utf8Value v)
       {
@@ -250,7 +249,9 @@ namespace PkgEditor.Views
         var innerPfsView = new PFSCReader(outerPfs.GetFile("pfs_image.dat").GetView());
         PreviewInnerPfsHeader(innerPfsView);
         var inner = new PfsReader(innerPfsView);
-        var view = new FileView(inner);
+        var view = new FileView();
+        view.AddRoot(outerPfs, "Outer PFS Image");
+        view.AddRoot(inner, "Inner PFS Image");
         view.Dock = DockStyle.Fill;
         filesTab.Controls.Clear();
         filesTab.Controls.Add(view);
