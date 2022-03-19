@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using LibOrbisPkg.Util;
 
 namespace LibOrbisPkg.SFO
@@ -108,6 +109,52 @@ namespace LibOrbisPkg.SFO
       return ret;
     }
     int keyTableOffset => 0x14 + (Values.Count * 0x10);
+
+    public async static Task<ParamSfo> FromStreamAsync(Stream s)
+    {
+      var ret = new ParamSfo();
+      var start = s.Position;
+      if (await s.ReadUInt32BEAsync() == 0x53434543)
+      {
+        start += 0x800;
+      }
+      s.Position = start;
+      if (await s.ReadUInt32BEAsync() != 0x00505346)
+      {
+        throw new InvalidDataException("File is missing SFO magic");
+      }
+      s.Position = start + 8;
+      var keyTableStart = await s.ReadInt32LEAsync();
+      var dataTableStart = await s.ReadInt32LEAsync();
+      var numValues = await s.ReadInt32LEAsync();
+      for (int value = 0; value < numValues; value++)
+      {
+        s.Position = value * 0x10 + 0x14 + start;
+        var keyOffset = await s.ReadUInt16LEAsync();
+        var format = (SfoEntryType)await s.ReadUInt16LEAsync();
+        var len = await s.ReadInt32LEAsync();
+        var maxLen = await s.ReadInt32LEAsync();
+        var dataOffset = await s.ReadUInt32LEAsync();
+        s.Position = start + keyTableStart + keyOffset;
+        var name = s.ReadASCIINullTerminated();
+        s.Position = start + dataTableStart + dataOffset;
+        switch (format)
+        {
+          case SfoEntryType.Integer:
+            ret.Values.Add(new IntegerValue(name, await s.ReadInt32LEAsync()));
+            break;
+          case SfoEntryType.Utf8:
+            ret.Values.Add(new Utf8Value(name, Encoding.UTF8.GetString(await s.ReadBytesAsync(len > 0 ? len - 1 : len)), maxLen));
+            break;
+          case SfoEntryType.Utf8Special:
+            ret.Values.Add(new Utf8SpecialValue(name, Encoding.UTF8.GetString(await s.ReadBytesAsync(len)), maxLen));
+            break;
+          default:
+            throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
+        }
+      }
+      return ret;
+    }
 
     public int FileSize => CalcSize().Item2;
 
