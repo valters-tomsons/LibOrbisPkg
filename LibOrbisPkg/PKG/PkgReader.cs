@@ -87,6 +87,39 @@ namespace LibOrbisPkg.PKG
       return pkg;
     }
 
+    public Header? ReadHeaderFromRemote()
+    {
+      var hdr = new Header
+      {
+        CNTMagic = s.ReadASCIINullTerminated(4)
+      };
+
+      if (hdr.CNTMagic != Pkg.MAGIC)
+      {
+        return null;
+      }
+
+      hdr.flags = (PKGFlags)UInt();
+      hdr.unk_0x08 = UInt();
+      hdr.unk_0x0C = UInt(); 
+      hdr.entry_count = UInt();
+      hdr.sc_entry_count = UShort();
+      hdr.entry_count_2 = UShort(); 
+      hdr.entry_table_offset = UInt();
+      hdr.main_ent_data_size = UInt();
+      hdr.body_offset = ULong();
+      hdr.body_size = ULong();
+
+      // Read & skip 16 bytes, since we cannot seek remote stream
+      for(var i = 0; i < 0x10; i++)
+      {
+        s.ReadByte();
+      }
+
+      hdr.content_id = s.ReadASCIINullTerminated(Pkg.PKG_CONTENT_ID_SIZE);
+      return hdr;
+    }
+
     public Header ReadHeader()
     {
       var hdr = new Header();
