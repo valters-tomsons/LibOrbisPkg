@@ -101,22 +101,73 @@ namespace LibOrbisPkg.PKG
 
       hdr.flags = (PKGFlags)UInt();
       hdr.unk_0x08 = UInt();
-      hdr.unk_0x0C = UInt(); 
+      hdr.unk_0x0C = UInt();
       hdr.entry_count = UInt();
       hdr.sc_entry_count = UShort();
-      hdr.entry_count_2 = UShort(); 
+      hdr.entry_count_2 = UShort();
       hdr.entry_table_offset = UInt();
       hdr.main_ent_data_size = UInt();
       hdr.body_offset = ULong();
       hdr.body_size = ULong();
 
-      // Read & skip 16 bytes, since we cannot seek remote stream
+      // Read to skip 16 bytes, since we cannot seek FTP stream manually
       for(var i = 0; i < 0x10; i++)
       {
         s.ReadByte();
       }
 
-      hdr.content_id = s.ReadASCIINullTerminated(Pkg.PKG_CONTENT_ID_SIZE);
+      hdr.content_id = s.ReadASCIINullTerminated(Pkg.PKG_CONTENT_ID_SIZE); // 0x40
+
+      for(var i = 0; i < 0xB; i++)
+      {
+        s.ReadByte();
+      }
+
+      hdr.drm_type = (DrmType)UInt(); // 0x70
+      hdr.content_type = (ContentType)UInt(); // 0x74
+      hdr.content_flags = (ContentFlags)UInt(); // 0x78
+      hdr.promote_size = UInt(); // 0x7C
+      hdr.version_date = UInt(); // 0x80
+      hdr.version_hash = UInt(); //0x84
+      hdr.unk_0x88 = UInt(); // 0x88
+      hdr.unk_0x8C = UInt(); // 0x8C
+      hdr.unk_0x90 = UInt(); //0x90
+      hdr.unk_0x94 = UInt(); // 0x94
+      hdr.iro_tag = (IROTag)UInt(); // 0x98
+      hdr.ekc_version = UInt(); // 0x9C
+
+      // Skip more bytes
+      for(var i = 0; i < 0x60; i++)
+      {
+        s.ReadByte();
+      }
+
+      hdr.sc_entries1_hash = ReadBytes(Pkg.HASH_SIZE); // 0x100
+      hdr.sc_entries2_hash = ReadBytes(Pkg.HASH_SIZE); // 0x120
+      hdr.digest_table_hash = ReadBytes(Pkg.HASH_SIZE); // 0x140
+      hdr.body_digest = ReadBytes(Pkg.HASH_SIZE); // 0x160
+
+      for(var i = 0; i < 0x280; i++)
+      {
+        s.ReadByte();
+      }
+
+      hdr.unk_0x400 = UInt(); // 0x400
+      hdr.pfs_image_count = UInt(); // 0x404
+      hdr.pfs_flags = ULong(); // 0x408
+      hdr.pfs_image_offset = ULong(); // 0x410
+      hdr.pfs_image_size = ULong(); // 0x418
+      hdr.mount_image_offset = ULong(); // 0x420
+      hdr.mount_image_size = ULong(); // 0x428
+      hdr.package_size = ULong(); // 0x430
+      hdr.pfs_signed_size = UInt(); // 0x438
+      hdr.pfs_cache_size = UInt(); // 0x43C
+
+      hdr.pfs_image_digest = ReadBytes(Pkg.HASH_SIZE); // 0x440
+      hdr.pfs_signed_digest = ReadBytes(Pkg.HASH_SIZE); // 0x460
+      hdr.pfs_split_size_nth_0 = ULong(); // 0x480
+      hdr.pfs_split_size_nth_1 = ULong(); // 0x488
+
       return hdr;
     }
 
