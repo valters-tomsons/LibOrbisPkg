@@ -94,14 +94,16 @@ namespace LibOrbisPkg.PKG
     }
     public static MetaEntry Read(Stream s)
     {
-      var ret = new MetaEntry();
-      ret.id = (EntryId)s.ReadUInt32BE();
-      ret.NameTableOffset = s.ReadUInt32BE();
-      ret.Flags1 = s.ReadUInt32BE();
-      ret.Flags2 = s.ReadUInt32BE();
-      ret.DataOffset = s.ReadUInt32BE();
-      ret.DataSize = s.ReadUInt32BE();
-      s.Position += 8;
+      var ret = new MetaEntry
+      {
+        id = (EntryId)s.ReadUInt32BE(),
+        NameTableOffset = s.ReadUInt32BE(),
+        Flags1 = s.ReadUInt32BE(),
+        Flags2 = s.ReadUInt32BE(),
+        DataOffset = s.ReadUInt32BE(),
+        DataSize = s.ReadUInt32BE()
+      };
+      // s.Position += 8;
       return ret;
     }
     public uint KeyIndex => (Flags2 & 0xF000) >> 12;

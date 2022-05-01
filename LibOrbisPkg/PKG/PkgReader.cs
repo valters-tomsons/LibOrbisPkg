@@ -1,12 +1,49 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using LibOrbisPkg.Util;
 
 namespace LibOrbisPkg.PKG
 {
-  public class PkgReader : Util.ReaderBase
+  public class PkgReader : ReaderBase
   {
-    public PkgReader(System.IO.Stream s) : base(true, s)
+    public PkgReader(Stream s) : base(true, s)
     {
+    }
+
+    public (Header? header, byte[] sfoBuffer) ReadRemotePkgData()
+    {
+      var header = ReadHeaderFromRemote();
+
+      if (header is null)
+      {
+        Console.WriteLine("Failed to read pkg header");
+        return (null, Array.Empty<byte>());
+      }
+
+      ReadBytes(0xFE0 - (int)s.Position);
+
+      var headerDigest = ReadBytes(32);
+      var headerSignature = ReadBytes(256);
+
+      ReadBytes((int)header?.entry_table_offset - (int)s.Position);
+
+      var metasEntry = new MetasEntry();
+      for (var i = 0; i < header?.entry_count; i++)
+      {
+        metasEntry.Metas.Add(MetaEntry.Read(s));
+        ReadBytes(8);
+      }
+
+      var sfoMetaEntry = metasEntry.Metas.SingleOrDefault(x => x.id == EntryId.PARAM_SFO);
+      if (sfoMetaEntry is null)
+      {
+        Console.WriteLine($"Failed to read SFO meta entry: {header?.content_id}");
+        return (header, Array.Empty<byte>());
+      }
+
+      ReadBytes((int)sfoMetaEntry.DataOffset - (int)s.Position);
+      return (header, ReadBytes((int)sfoMetaEntry.DataSize));
     }
 
     public Pkg ReadPkg()
@@ -111,17 +148,11 @@ namespace LibOrbisPkg.PKG
       hdr.body_size = ULong();
 
       // Read to skip 16 bytes, since we cannot seek FTP stream manually
-      for(var i = 0; i < 0x10; i++)
-      {
-        s.ReadByte();
-      }
+      ReadBytes(0x10);
 
       hdr.content_id = s.ReadASCIINullTerminated(Pkg.PKG_CONTENT_ID_SIZE); // 0x40
 
-      for(var i = 0; i < 0xB; i++)
-      {
-        s.ReadByte();
-      }
+      ReadBytes(0xB);
 
       hdr.drm_type = (DrmType)UInt(); // 0x70
       hdr.content_type = (ContentType)UInt(); // 0x74
@@ -136,21 +167,14 @@ namespace LibOrbisPkg.PKG
       hdr.iro_tag = (IROTag)UInt(); // 0x98
       hdr.ekc_version = UInt(); // 0x9C
 
-      // Skip more bytes
-      for(var i = 0; i < 0x60; i++)
-      {
-        s.ReadByte();
-      }
+      ReadBytes(0x60);
 
       hdr.sc_entries1_hash = ReadBytes(Pkg.HASH_SIZE); // 0x100
       hdr.sc_entries2_hash = ReadBytes(Pkg.HASH_SIZE); // 0x120
       hdr.digest_table_hash = ReadBytes(Pkg.HASH_SIZE); // 0x140
       hdr.body_digest = ReadBytes(Pkg.HASH_SIZE); // 0x160
 
-      for(var i = 0; i < 0x280; i++)
-      {
-        s.ReadByte();
-      }
+      ReadBytes(0x280);
 
       hdr.unk_0x400 = UInt(); // 0x400
       hdr.pfs_image_count = UInt(); // 0x404

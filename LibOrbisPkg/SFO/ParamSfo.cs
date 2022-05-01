@@ -63,34 +63,55 @@ namespace LibOrbisPkg.SFO
       return null;
     }
 
+    protected static byte[] ReadBytes(Stream s, int count)
+    {
+      var ret = new byte[count];
+      s.Read(ret, 0, count);
+      return ret;
+    }
+
     public static ParamSfo FromStream(Stream s)
     {
-      var ret = new ParamSfo();
-      var start = s.Position;
-      if (s.ReadUInt32BE() == 0x53434543)
+      var sfoMagic = s.ReadUInt32BE();
+
+      if (sfoMagic == 0x53434543)
       {
-        start = start + 0x800;
+        ReadBytes(s, 0x800);
       }
-      s.Position = start;
-      if (s.ReadUInt32BE() != 0x00505346)
+
+      var start = s.Position;
+
+      if (sfoMagic != 0x00505346)
       {
         throw new InvalidDataException("File is missing SFO magic");
       }
-      s.Position = start + 8;
+
+      // ReadBytes(s, 8);
+
       var keyTableStart = s.ReadInt32LE();
       var dataTableStart = s.ReadInt32LE();
       var numValues = s.ReadInt32LE();
+      var ret = new ParamSfo();
       for (int value = 0; value < numValues; value++)
       {
-        s.Position = value * 0x10 + 0x14 + start;
+        var newPos = (value * 0x10) + 0x14 + start;
+        ReadBytes(s, (int)newPos - (int)s.Position);
+
         var keyOffset = s.ReadUInt16LE();
         var format = (SfoEntryType)s.ReadUInt16LE();
         var len = s.ReadInt32LE();
         var maxLen = s.ReadInt32LE();
         var dataOffset = s.ReadUInt32LE();
-        s.Position = start + keyTableStart + keyOffset;
+
+        // s.Position = start + keyTableStart + keyOffset;
+        newPos = start + keyTableStart + keyOffset;
+        ReadBytes(s, (int)newPos - (int)s.Position);
+
         var name = s.ReadASCIINullTerminated();
-        s.Position = start + dataTableStart + dataOffset;
+
+        newPos = start + dataTableStart + dataOffset;
+        ReadBytes(s, (int)newPos - (int)s.Position);
+
         switch (format)
         {
           case SfoEntryType.Integer:
@@ -102,15 +123,15 @@ namespace LibOrbisPkg.SFO
           case SfoEntryType.Utf8Special:
             ret.Values.Add(new Utf8SpecialValue(name, Encoding.UTF8.GetString(s.ReadBytes(len)), maxLen));
             break;
-          default:
-            throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
+          // default:
+          //   throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
         }
       }
       return ret;
     }
     int keyTableOffset => 0x14 + (Values.Count * 0x10);
 
-    public async static Task<ParamSfo> FromStreamAsync(Stream s)
+    public async static Task<ParamSfo?> FromStreamAsync(Stream s)
     {
       var ret = new ParamSfo();
       var start = s.Position;
@@ -121,7 +142,7 @@ namespace LibOrbisPkg.SFO
       s.Position = start;
       if (await s.ReadUInt32BEAsync() != 0x00505346)
       {
-        throw new InvalidDataException("File is missing SFO magic");
+        return null;
       }
       s.Position = start + 8;
       var keyTableStart = await s.ReadInt32LEAsync();
@@ -150,7 +171,8 @@ namespace LibOrbisPkg.SFO
             ret.Values.Add(new Utf8SpecialValue(name, Encoding.UTF8.GetString(await s.ReadBytesAsync(len)), maxLen));
             break;
           default:
-            throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
+            // throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
+            return null;
         }
       }
       return ret;
