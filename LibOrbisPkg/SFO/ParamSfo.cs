@@ -123,8 +123,8 @@ namespace LibOrbisPkg.SFO
           case SfoEntryType.Utf8Special:
             ret.Values.Add(new Utf8SpecialValue(name, Encoding.UTF8.GetString(s.ReadBytes(len)), maxLen));
             break;
-          // default:
-          //   throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
+            // default:
+            //   throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
         }
       }
       return ret;
@@ -150,7 +150,7 @@ namespace LibOrbisPkg.SFO
       var numValues = await s.ReadInt32LEAsync();
       for (int value = 0; value < numValues; value++)
       {
-        s.Position = value * 0x10 + 0x14 + start;
+        s.Position = (value * 0x10) + 0x14 + start;
         var keyOffset = await s.ReadUInt16LEAsync();
         var format = (SfoEntryType)await s.ReadUInt16LEAsync();
         var len = await s.ReadInt32LEAsync();
@@ -171,7 +171,7 @@ namespace LibOrbisPkg.SFO
             ret.Values.Add(new Utf8SpecialValue(name, Encoding.UTF8.GetString(await s.ReadBytesAsync(len)), maxLen));
             break;
           default:
-            // throw new Exception($"Unknown SFO type: {(ushort)format:X4}");
+            Console.WriteLine($"Unknown SFO type: {(ushort)format:X4}");
             return null;
         }
       }
